@@ -1,0 +1,71 @@
+{{- if .Values.opentelemetryCollector.enabled }}
+apiVersion: opentelemetry.io/v1beta1
+kind: OpenTelemetryCollector
+metadata:
+  name: {{ .Values.opentelemetryCollector.name }}
+  namespace: {{ .Values.global.namespace }}
+spec:
+  image: {{ .Values.opentelemetryCollector.image }}
+  mode: deployment
+  replicas: 1
+
+  resources:
+    limits:
+      cpu: {{ .Values.opentelemetryCollector.resources.limits.cpu }}
+      memory: {{ .Values.opentelemetryCollector.resources.limits.memory }}
+    requests:
+      cpu: {{ .Values.opentelemetryCollector.resources.requests.cpu }}
+      memory: {{ .Values.opentelemetryCollector.resources.requests.memory }}
+
+  config:
+    receivers:
+      otlp:
+        protocols:
+          grpc:
+            endpoint: 0.0.0.0:4317
+          http:
+            endpoint: 0.0.0.0:4318
+
+      prometheus:
+        config:
+          scrape_configs:
+            - job_name: 'otel-collector'
+              scrape_interval: 10s
+              static_configs:
+                - targets: ['0.0.0.0:8888']
+
+    processors:
+      batch:
+        timeout: 10s
+        send_batch_size: 1024
+
+      memory_limiter:
+        check_interval: 1s
+        limit_mib: 400
+
+    exporters:
+      otlp/tempo:
+        endpoint: {{ .Values.opentelemetryCollector.exporters.tempoEndpoint }}
+        tls:
+          insecure: true
+
+      prometheusremotewrite:
+        endpoint: {{ .Values.opentelemetryCollector.exporters.prometheusEndpoint }}
+        tls:
+          insecure: true
+
+      logging:
+        loglevel: info
+
+    service:
+      pipelines:
+        traces:
+          receivers: [otlp]
+          processors: [memory_limiter, batch]
+          exporters: [otlp/tempo, logging]
+
+        metrics:
+          receivers: [otlp, prometheus]
+          processors: [memory_limiter, batch]
+          exporters: [prometheusremotewrite, logging]
+{{- end }}
