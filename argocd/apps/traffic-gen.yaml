@@ -1,0 +1,27 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: traffic-gen
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/Mateo-Favard/diiage-finals
+    targetRevision: main
+    path: traffic-gen-app/chart
+    helm:
+      releaseName: traffic-gen
+      values: |
+        trafficGen:
+          backendUrl: "http://backend.backend.svc.cluster.local:80"
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: traffic-gen
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
